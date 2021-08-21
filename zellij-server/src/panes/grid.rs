@@ -349,6 +349,7 @@ pub struct Grid {
     output_buffer: OutputBuffer,
     title_stack: Vec<String>,
     pub changed_colors: Option<[Option<AnsiCode>; 256]>,
+    pub is_scrolled: bool,
     pub should_render: bool,
     pub cursor_key_mode: bool, // DECCKM - when set, cursor keys should send ANSI direction codes (eg. "OD") instead of the arrow keys (eg. "[D")
     pub erasure_mode: bool,    // ERM
@@ -392,6 +393,7 @@ impl Grid {
             cursor_key_mode: false,
             erasure_mode: false,
             insert_mode: false,
+            is_scrolled: false,
             disable_linewrap: false,
             alternative_lines_above_viewport_and_cursor: None,
             clear_viewport_before_rendering: false,
@@ -535,6 +537,7 @@ impl Grid {
     }
     pub fn scroll_up_one_line(&mut self) {
         if !self.lines_above.is_empty() && self.viewport.len() == self.height {
+            self.is_scrolled = true;
             let line_to_push_down = self.viewport.pop().unwrap();
             self.lines_below.insert(0, line_to_push_down);
 
@@ -569,6 +572,9 @@ impl Grid {
 
             self.selection.move_up(1);
             self.output_buffer.update_all_lines();
+        }
+        if self.lines_below.is_empty() {
+            self.is_scrolled = false;
         }
     }
     fn force_change_size(&mut self, new_rows: usize, new_columns: usize) {

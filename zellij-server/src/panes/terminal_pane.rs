@@ -43,6 +43,7 @@ pub struct TerminalPane {
     pub active_at: Instant,
     pub colors: Palette,
     vte_parser: vte::Parser,
+    pending_vte_events: Option<Vec<VteBytes>>,
     selection_scrolled_at: time::Instant,
     content_position_and_size: PositionAndSize,
     pane_title: String,
@@ -87,8 +88,16 @@ impl Pane for TerminalPane {
         self.redistribute_space();
     }
     fn handle_pty_bytes(&mut self, bytes: VteBytes) {
-        for byte in bytes.iter() {
-            self.vte_parser.advance(&mut self.grid, *byte);
+        if self.grid.is_scrolled {
+            if let Some(ref mut events) = self.pending_vte_events {
+                events.push(bytes);
+            } else {
+                self.pending_vte_events = Some(vec![bytes]);
+            }
+        } else {
+            for byte in bytes.iter() {
+                self.vte_parser.advance(&mut self.grid, *byte);
+            }
         }
         self.set_should_render(true);
     }
@@ -319,6 +328,9 @@ impl Pane for TerminalPane {
     }
     fn scroll_down(&mut self, count: usize) {
         self.grid.move_viewport_down(count);
+        if !self.grid.is_scrolled && self.pending_vte_events.is_some() {
+            self.play_pending_vte_events();
+        }
         self.set_should_render(true);
     }
     fn clear_scroll(&mut self) {
@@ -450,6 +462,7 @@ impl TerminalPane {
             position_and_size,
             position_and_size_override: None,
             vte_parser: vte::Parser::new(),
+            pending_vte_events: None,
             active_at: Instant::now(),
             colors: palette,
             selection_scrolled_at: time::Instant::now(),
@@ -529,6 +542,14 @@ impl TerminalPane {
             }
         };
         self.reflow_lines();
+    }
+    fn play_pending_vte_events(&mut self) {
+        let events = self.pending_vte_events.take();
+        if let Some(mut events) = events {
+            events
+                .drain(..)
+                .for_each(|bytes| self.handle_pty_bytes(bytes));
+        }
     }
 }
 
