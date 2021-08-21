@@ -328,13 +328,12 @@ impl Pane for TerminalPane {
     }
     fn scroll_down(&mut self, count: usize) {
         self.grid.move_viewport_down(count);
-        if !self.grid.is_scrolled && self.pending_vte_events.is_some() {
-            self.play_pending_vte_events();
-        }
+        self.play_pending_vte_events();
         self.set_should_render(true);
     }
     fn clear_scroll(&mut self) {
         self.grid.reset_viewport();
+        self.play_pending_vte_events();
         self.set_should_render(true);
     }
 
@@ -544,8 +543,8 @@ impl TerminalPane {
         self.reflow_lines();
     }
     fn play_pending_vte_events(&mut self) {
-        let events = self.pending_vte_events.take();
-        if let Some(mut events) = events {
+        if !self.grid.is_scrolled && self.pending_vte_events.is_some() {
+            let mut events = self.pending_vte_events.take().unwrap();
             events
                 .drain(..)
                 .for_each(|bytes| self.handle_pty_bytes(bytes));
