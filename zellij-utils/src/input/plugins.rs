@@ -129,6 +129,16 @@ impl Plugin {
             .or_else(|_| fs::read(plugin_dir.join(&self.path).with_extension("wasm")))
             .ok()
     }
+
+    /// Sets the tab index inside of the plugin type of the run field.
+    pub fn set_tab_index(&mut self, tab_index: usize) {
+        match self.run {
+            PluginType::OncePerPane(..) => {
+                self.run = PluginType::OncePerPane(Some(tab_index));
+            }
+            PluginType::Headless => {}
+        }
+    }
 }
 
 /// Type of the plugin. Defaults to OncePerPane.
