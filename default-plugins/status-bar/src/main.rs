@@ -133,7 +133,7 @@ fn color_elements(palette: Palette) -> ColoredElements {
 }
 
 impl ZellijPlugin for State {
-    fn load(&mut self) {
+    fn load(&mut self, _: Options) {
         set_selectable(false);
         subscribe(&[
             EventType::ModeUpdate,

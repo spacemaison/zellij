@@ -3,6 +3,9 @@ use std::fmt;
 use std::str::FromStr;
 use strum_macros::{EnumDiscriminants, EnumIter, EnumString, ToString};
 
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Options;
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Key {
     Backspace,

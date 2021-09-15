@@ -185,6 +185,10 @@ fn start_plugin(
 
     let start = instance.exports.get_function("_start").unwrap();
 
+    let opts: serde_json::Value = serde_json::from_str(&plugin_env.plugin.options).unwrap();
+    // Write the JSON options object to the plugin to be read on startup
+    wasi_write_object(&plugin_env.wasi_env, &opts);
+
     // This eventually calls the `.load()` method
     start.call(&[]).unwrap();
 

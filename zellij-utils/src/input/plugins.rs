@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use url::Url;
 
 use super::config::ConfigFromYaml;
@@ -51,8 +52,23 @@ impl Plugins {
                 tag: PluginTag::default(),
                 run: PluginType::OncePerPane(None),
                 _allow_exec_host_cmd: run._allow_exec_host_cmd,
+                options: serde_json::to_string(&run.options).unwrap(),
             }),
-            RunPluginLocation::Zellij(tag) => self.0.get(tag).cloned(),
+            RunPluginLocation::Zellij(tag) => match self.0.get(tag).cloned() {
+                Some(mut plugin) => {
+                    let mut options: serde_yaml::Value =
+                        serde_yaml::from_str(&plugin.options).unwrap();
+
+                    if let Some(run_options) = run.options.clone() {
+                        merge_yaml(&mut options, run_options);
+                    }
+
+                    plugin.options = serde_json::to_string(&options).unwrap();
+
+                    Some(plugin)
+                }
+                None => None,
+            },
         }
     }
 
@@ -93,6 +109,10 @@ impl From<PluginFromYaml> for Plugin {
                 PluginTypeFromYaml::Headless => PluginType::Headless,
             },
             _allow_exec_host_cmd: plugin._allow_exec_host_cmd,
+            options: plugin
+                .options
+                .map(|options| serde_json::to_string(&options).unwrap())
+                .unwrap_or_else(|| "null".into()),
         }
     }
 }
@@ -108,6 +128,10 @@ pub struct Plugin {
     pub run: PluginType,
     /// Allow command execution from plugin
     pub _allow_exec_host_cmd: bool,
+    /// Encoded JSON options string. This is a JSON string rather than a serde_json::Value because
+    /// the bincode crate that used to serialize/deserialize messages between the client and server
+    /// doesn't support unstructured data formats.
+    pub options: String,
 }
 
 impl Plugin {
@@ -168,9 +192,9 @@ pub struct PluginFromYaml {
     #[serde(default)]
     pub run: PluginTypeFromYaml,
     #[serde(default)]
-    pub config: serde_yaml::Value,
-    #[serde(default)]
     pub _allow_exec_host_cmd: bool,
+    #[serde(default)]
+    pub options: Option<Value>,
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -215,6 +239,28 @@ impl Display for PluginsError {
     }
 }
 
+fn merge_yaml(a: &mut serde_yaml::Value, b: serde_yaml::Value) {
+    match (a, b) {
+        (a @ &mut serde_yaml::Value::Mapping(_), serde_yaml::Value::Mapping(b)) => {
+            let a = a.as_mapping_mut().unwrap();
+            for (k, v) in b {
+                if v.is_sequence() && a.contains_key(&k) && a[&k].is_sequence() {
+                    let mut _b = a.get(&k).unwrap().as_sequence().unwrap().to_owned();
+                    _b.append(&mut v.as_sequence().unwrap().to_owned());
+                    a[&k] = serde_yaml::Value::from(_b);
+                    continue;
+                }
+                if !a.contains_key(&k) {
+                    a.insert(k.to_owned(), v.to_owned());
+                } else {
+                    merge_yaml(&mut a[&k], v);
+                }
+            }
+        }
+        (a, b) => *a = b,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,7 +288,115 @@ mod tests {
     }
 
     #[test]
-    fn default_plugins() -> Result<(), ConfigError> {
+    fn plugins_allow_options() -> Result<(), ConfigError> {
+        let ConfigFromYaml { plugins, .. } = serde_yaml::from_str(
+            "
+            plugins:
+                - path: /foo/bar/baz.wasm
+                  tag: boo
+                  options:
+                    foo: bar
+                    you: too
+        ",
+        )?;
+
+        let plugins: Plugins = plugins.try_into()?;
+
+        assert_eq!(
+            plugins.get(RunPlugin {
+                location: RunPluginLocation::Zellij(PluginTag::new("boo")),
+                options: None,
+                ..Default::default()
+            }),
+            Some(Plugin {
+                _allow_exec_host_cmd: false,
+                path: PathBuf::from("/foo/bar/baz.wasm"),
+                tag: PluginTag::new("boo"),
+                run: PluginType::OncePerPane(None),
+                options: {
+                    let yaml: serde_yaml::Value = serde_yaml::from_str("foo: bar\nyou: too")?;
+                    serde_json::to_string(&yaml).unwrap()
+                }
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn plugins_allow_overriding_options_from_run_configuration() -> Result<(), ConfigError> {
+        let ConfigFromYaml { plugins, .. } = serde_yaml::from_str(
+            "
+            plugins:
+                - path: /foo/bar/baz.wasm
+                  tag: boo
+                  options:
+                    foo: bar
+                    you: too
+        ",
+        )?;
+
+        let plugins: Plugins = plugins.try_into()?;
+
+        assert_eq!(
+            plugins.get(RunPlugin {
+                location: RunPluginLocation::Zellij(PluginTag::new("boo")),
+                options: serde_yaml::from_str("foo: boo").unwrap(),
+                ..Default::default()
+            }),
+            Some(Plugin {
+                _allow_exec_host_cmd: false,
+                path: PathBuf::from("/foo/bar/baz.wasm"),
+                tag: PluginTag::new("boo"),
+                run: PluginType::OncePerPane(None),
+                options: {
+                    let yaml: serde_yaml::Value = serde_yaml::from_str(
+                        "
+                           foo: boo
+                           you: too
+                   ",
+                    )
+                    .unwrap();
+                    serde_json::to_string(&yaml).unwrap()
+                }
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn plugins_allow_options_entirely_from_run_configuration() -> Result<(), ConfigError> {
+        let ConfigFromYaml { plugins, .. } = serde_yaml::from_str(
+            "
+            plugins:
+                - path: /foo/bar/baz.wasm
+                  tag: boo
+        ",
+        )?;
+
+        let plugins: Plugins = plugins.try_into()?;
+
+        assert_eq!(
+            plugins.get(RunPlugin {
+                location: RunPluginLocation::Zellij(PluginTag::new("boo")),
+                options: serde_yaml::from_str("foo: boo").unwrap(),
+                ..Default::default()
+            }),
+            Some(Plugin {
+                _allow_exec_host_cmd: false,
+                path: PathBuf::from("/foo/bar/baz.wasm"),
+                tag: PluginTag::new("boo"),
+                run: PluginType::OncePerPane(None),
+                options: {
+                    let yaml: serde_yaml::Value = serde_yaml::from_str("foo: boo").unwrap();
+                    serde_json::to_string(&yaml).unwrap()
+                }
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn plugins_can_inject_defaults() -> Result<(), ConfigError> {
         let ConfigFromYaml { plugins, .. } = serde_yaml::from_str(
             "
             plugins:
@@ -257,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn default_plugins_allow_overriding() -> Result<(), ConfigError> {
+    fn plugins_with_defaults_allow_overriding() -> Result<(), ConfigError> {
         let ConfigFromYaml { plugins, .. } = serde_yaml::from_str(
             "
             plugins:
@@ -269,14 +423,15 @@ mod tests {
 
         assert_eq!(
             plugins.get(RunPlugin {
-                _allow_exec_host_cmd: false,
-                location: RunPluginLocation::Zellij(PluginTag::new("tab-bar"))
+                location: RunPluginLocation::Zellij(PluginTag::new("tab-bar")),
+                ..Default::default()
             }),
             Some(Plugin {
                 _allow_exec_host_cmd: false,
                 path: PathBuf::from("boo.wasm"),
                 tag: PluginTag::new("tab-bar"),
                 run: PluginType::OncePerPane(None),
+                options: "null".into()
             })
         );
 

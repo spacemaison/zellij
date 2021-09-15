@@ -77,14 +77,16 @@ pub struct RunPluginFromYaml {
     #[serde(default)]
     pub _allow_exec_host_cmd: bool,
     pub location: Url,
+    pub options: Option<serde_yaml::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(crate = "self::serde")]
 pub struct RunPlugin {
     #[serde(default)]
     pub _allow_exec_host_cmd: bool,
     pub location: RunPluginLocation,
+    pub options: Option<serde_yaml::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -92,6 +94,12 @@ pub struct RunPlugin {
 pub enum RunPluginLocation {
     File(PathBuf),
     Zellij(PluginTag),
+}
+
+impl Default for RunPluginLocation {
+    fn default() -> Self {
+        Self::Zellij(PluginTag::new(""))
+    }
 }
 
 impl fmt::Display for RunPluginLocation {
@@ -460,6 +468,7 @@ impl TryFrom<RunFromYaml> for Run {
             RunFromYaml::Plugin(plugin) => Ok(Run::Plugin(RunPlugin {
                 _allow_exec_host_cmd: plugin._allow_exec_host_cmd,
                 location: plugin.location.try_into()?,
+                options: plugin.options,
             })),
         }
     }

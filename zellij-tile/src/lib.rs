@@ -5,8 +5,8 @@ pub mod shim;
 use data::*;
 
 #[allow(unused_variables)]
-pub trait ZellijPlugin {
-    fn load(&mut self) {}
+pub trait ZellijPlugin<T: Default = Options> {
+    fn load(&mut self, options: T) {}
     fn update(&mut self, event: Event) {}
     fn render(&mut self, rows: usize, cols: usize) {}
 }
@@ -19,8 +19,16 @@ macro_rules! register_plugin {
         }
 
         fn main() {
+            let options = $crate::shim::object_from_stdin().map_err(|err| {
+                eprintln!(
+                    "Your plugins configuration had a deserialization error: {:?}.",
+                    err
+                );
+                err
+            });
+
             STATE.with(|state| {
-                state.borrow_mut().load();
+                state.borrow_mut().load(options.unwrap_or_default());
             });
         }
 

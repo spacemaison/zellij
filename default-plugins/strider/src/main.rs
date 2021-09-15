@@ -8,7 +8,7 @@ use zellij_tile::prelude::*;
 register_plugin!(State);
 
 impl ZellijPlugin for State {
-    fn load(&mut self) {
+    fn load(&mut self, _: Options) {
         refresh_directory(self);
         subscribe(&[EventType::KeyPress]);
     }

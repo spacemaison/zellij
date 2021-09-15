@@ -48,7 +48,7 @@ fn default_layout_merged_correctly() {
                 split_size: Some(SplitSize::Fixed(1)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("tab-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
             Layout {
@@ -65,7 +65,7 @@ fn default_layout_merged_correctly() {
                 split_size: Some(SplitSize::Fixed(2)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("status-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
         ],
@@ -92,7 +92,7 @@ fn default_layout_new_tab_correct() {
                 split_size: Some(SplitSize::Fixed(1)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("tab-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
             Layout {
@@ -109,7 +109,7 @@ fn default_layout_new_tab_correct() {
                 split_size: Some(SplitSize::Fixed(2)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("status-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
         ],
@@ -268,7 +268,7 @@ fn three_panes_with_tab_and_default_plugins_merged_correctly() {
                 split_size: Some(SplitSize::Fixed(1)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("tab-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
             Layout {
@@ -315,7 +315,7 @@ fn three_panes_with_tab_and_default_plugins_merged_correctly() {
                 split_size: Some(SplitSize::Fixed(2)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("status-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
         ],
@@ -342,7 +342,7 @@ fn three_panes_with_tab_and_default_plugins_new_tab_is_correct() {
                 split_size: Some(SplitSize::Fixed(1)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("tab-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
             Layout {
@@ -359,7 +359,7 @@ fn three_panes_with_tab_and_default_plugins_new_tab_is_correct() {
                 split_size: Some(SplitSize::Fixed(2)),
                 run: Some(Run::Plugin(RunPlugin {
                     location: RunPluginLocation::Zellij(PluginTag::new("status-bar")),
-                    _allow_exec_host_cmd: false,
+                    ..Default::default()
                 })),
             },
         ],
